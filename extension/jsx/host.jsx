@@ -7,6 +7,9 @@
     var name = "";
     try { name = BridgeTalk.appName; } catch (e2) { name = ""; }
     var impl = (name === "illustrator") ? "ai.jsx" : (name === "indesign" ? "id.jsx" : "ae.jsx");
-    $.evalFile(File(dir + "/common.jsx"));
-    $.evalFile(File(dir + "/" + impl));
+    // Auto-run by the manifest's ScriptPath on every panel launch, outside any caller's
+    // try/catch: an uncaught error here can leave the ExtendScript engine unable to run
+    // anything at all for the rest of the session, so every step below is guarded.
+    try { $.evalFile(File(dir + "/common.jsx")); } catch (e3) {}
+    try { $.evalFile(File(dir + "/" + impl)); } catch (e4) {}
 })();
