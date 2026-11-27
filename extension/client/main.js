@@ -10,6 +10,7 @@
     toggle: document.getElementById("toggle"),
     deep: document.getElementById("deep"),
     refresh: document.getElementById("refresh"),
+    typeFilter: document.getElementById("typeFilter"),
     list: document.getElementById("list"),
     empty: document.getElementById("empty"),
     toast: document.getElementById("toast")
@@ -35,6 +36,8 @@
     status: "init",
     deep: readPref("deep", false),
     collapsed: readPref("collapsed", false),
+    typeFilter: readPrefStr("typeFilter", "all"),
+    typesSeen: ["all"],
     lastFp: null,
     busy: false,        // an apply / pick is in flight
     scanning: false,
@@ -54,6 +57,15 @@
   }
   function writePref(key, val) {
     try { window.localStorage.setItem("sc." + key, val ? "1" : "0"); } catch (e) { /* ignore */ }
+  }
+  function readPrefStr(key, fallback) {
+    try {
+      var v = window.localStorage.getItem("sc." + key);
+      return v === null ? fallback : v;
+    } catch (e) { return fallback; }
+  }
+  function writePrefStr(key, val) {
+    try { window.localStorage.setItem("sc." + key, val); } catch (e) { /* ignore */ }
   }
 
   function evalJSX(script) {
@@ -375,7 +387,7 @@
   function applyColor(oldId, newHex, targetId) {
     return enqueue(function () {
       setBusy(true);
-      return call("SC_apply", [oldId, newHex, state.deep, targetId || ""]).then(function (res) {
+      return call("SC_apply", [oldId, newHex, state.deep, targetId || "", state.typeFilter]).then(function (res) {
         var r = parse(res), ok = !!(r && r.ok);
         if (!r) { toast(describeFailure(res)); }
         else if (!r.ok) { toast(r.error || "Could not change colour"); }
@@ -394,7 +406,7 @@
   function applyOpacity(id, opacity) {
     return enqueue(function () {
       setBusy(true);
-      return call("SC_setOpacity", [id, opacity]).then(function (res) {
+      return call("SC_setOpacity", [id, opacity, state.typeFilter]).then(function (res) {
         var r = parse(res), ok = !!(r && r.ok);
         if (!r) { toast(describeFailure(res)); } else if (!r.ok) { toast(r.error || "Could not change opacity"); }
         setBusy(false);
@@ -691,7 +703,7 @@
 
   function selectMatching(id) {
     enqueue(function () {
-      return call("SC_selectMatching", [id, state.deep]).then(function (res) {
+      return call("SC_selectMatching", [id, state.deep, state.typeFilter]).then(function (res) {
         var r = parse(res);
         if (r && !r.ok) { toast(r.error || "Could not change selection"); }
         return scan(true);
@@ -710,10 +722,10 @@
     if (state.busy && !force) { return Promise.resolve(); }
     state.scanning = true;
     return call("SC_fingerprint").then(function (fp) {
-      var key = String(fp) + "|" + (state.deep ? 1 : 0);
+      var key = String(fp) + "|" + (state.deep ? 1 : 0) + "|" + state.typeFilter;
       if (!force && key === state.lastFp) { return; }
       state.lastFp = key;
-      return call("SC_scan", [state.deep]).then(function (res) {
+      return call("SC_scan", [state.deep, state.typeFilter]).then(function (res) {
         var r = parse(res);
         if (!r) {
           state.status = "error";
@@ -723,6 +735,7 @@
           state.status = r.status;
           state.error = r.error || "";
           state.colors = r.colors || [];
+          if (r.types) { updateTypeOptions(r.types); }
         }
         render();
       });
@@ -798,6 +811,37 @@
     state.deep = !state.deep;
     writePref("deep", state.deep);
     render();
+    scan(true);
+  });
+  var TYPE_LABELS = {
+    all: "All types", shape: "Shapes", text: "Text", solid: "Solids",
+    null: "Nulls", adjustment: "Adjustment", light: "Lights", camera: "Cameras",
+    precomp: "Precomps", footage: "Footage", other: "Other"
+  };
+  function updateTypeOptions(types) {
+    var prevSet = state.typesSeen.filter(function (t) { return t !== "all"; }).slice().sort().join(",");
+    var nextSet = types.slice().sort().join(",");
+    if (prevSet === nextSet) { return; }
+    state.typesSeen = ["all"].concat(types);
+    var sel = els.typeFilter, cur = state.typeFilter;
+    sel.innerHTML = "";
+    var optAll = document.createElement("option");
+    optAll.value = "all"; optAll.textContent = "All types";
+    sel.appendChild(optAll);
+    types.forEach(function (t) {
+      var o = document.createElement("option");
+      o.value = t; o.textContent = TYPE_LABELS[t] || t;
+      sel.appendChild(o);
+    });
+    if (state.typesSeen.indexOf(cur) === -1) {
+      state.typeFilter = "all";
+      writePrefStr("typeFilter", "all");
+    }
+    sel.value = state.typeFilter;
+  }
+  els.typeFilter.addEventListener("change", function () {
+    state.typeFilter = els.typeFilter.value;
+    writePrefStr("typeFilter", state.typeFilter);
     scan(true);
   });
   els.refresh.addEventListener("click", function () {

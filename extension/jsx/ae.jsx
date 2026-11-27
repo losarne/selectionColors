@@ -111,6 +111,24 @@ function SC_walkStyles(stylesGroup, layer, ctx) {
     }
 }
 
+/* Rough layer-type bucket, for the panel's "sort by type" view. */
+function SC_layerType(layer) {
+    try {
+        if (layer instanceof CameraLayer) { return "camera"; }
+        if (layer instanceof LightLayer) { return "light"; }
+        if (layer instanceof TextLayer) { return "text"; }
+        if (layer instanceof ShapeLayer) { return "shape"; }
+        if (layer.nullLayer === true) { return "null"; }
+        if (layer.adjustmentLayer === true) { return "adjustment"; }
+        if (layer instanceof AVLayer) {
+            var src = null;
+            try { src = layer.source; } catch (e0) { src = null; }
+            return (src instanceof CompItem) ? "precomp" : "footage";
+        }
+    } catch (e) {}
+    return "other";
+}
+
 function SC_isSolidItem(item) {
     try {
         return (item instanceof FootageItem) && item.mainSource && (item.mainSource instanceof SolidSource);
@@ -153,6 +171,16 @@ function SC_collect(layers, deep) {
     var ctx = SC_newCtx(deep);
     for (var i = 0; i < layers.length; i++) { SC_visitLayer(layers[i], ctx); }
     return ctx.sites;
+}
+
+function SC_siteType(site) { return (site.t === "solid") ? "solid" : SC_layerType(site.layer); }
+
+/* typeFilter: "" / "all" = no filtering. */
+function SC_filterSites(sites, typeFilter) {
+    if (!typeFilter || typeFilter === "all") { return sites; }
+    var out = [];
+    for (var i = 0; i < sites.length; i++) { if (SC_siteType(sites[i]) === typeFilter) { out.push(sites[i]); } }
+    return out;
 }
 
 /* ------------------------------------------------------- reading values */
@@ -337,14 +365,17 @@ function SC_fingerprint() {
     } catch (e) { return "err:" + e.toString(); }
 }
 
-function SC_scan(deep) {
+function SC_scan(deep, typeFilter) {
     try {
         var comp = SC_activeComp();
         if (!comp) { return SC_json({ status: "nocomp", colors: [] }); }
         var layers = SC_selectedLayers(comp);
         if (layers.length === 0) { return SC_json({ status: "nosel", colors: [] }); }
 
-        var sites = SC_collect(layers, deep), map = {}, list = [], i, j;
+        var allSites = SC_collect(layers, deep), typesPresent = {}, i;
+        for (i = 0; i < allSites.length; i++) { typesPresent[SC_siteType(allSites[i])] = true; }
+
+        var sites = SC_filterSites(allSites, typeFilter), map = {}, list = [], j;
         for (i = 0; i < sites.length; i++) {
             var hexes = SC_siteHexes(sites[i]);
             for (j = 0; j < hexes.length; j++) {
@@ -359,13 +390,15 @@ function SC_scan(deep) {
             }
         }
         list.sort(function (a, b) { return (b.count - a.count) || (a.order - b.order); });
-        return SC_json({ status: "ok", layers: layers.length, colors: list });
+        var types = [];
+        for (var k in typesPresent) { if (typesPresent.hasOwnProperty(k)) { types.push(k); } }
+        return SC_json({ status: "ok", layers: layers.length, colors: list, types: types });
     } catch (err) {
         return SC_json({ status: "error", error: err.toString() + (err.line ? " (line " + err.line + ")" : ""), colors: [] });
     }
 }
 
-function SC_apply(oldHex, newHex, deep) {
+function SC_apply(oldHex, newHex, deep, targetKey, typeFilter) {
     oldHex = String(oldHex).toUpperCase();
     newHex = String(newHex).toUpperCase();
     if (!SC_isHex6(oldHex) || !SC_isHex6(newHex)) { return SC_json({ ok: false, error: "Invalid hex" }); }
@@ -380,7 +413,7 @@ function SC_apply(oldHex, newHex, deep) {
 
     app.beginUndoGroup("Selection Colors: #" + oldHex + " \u2192 #" + newHex);
     try {
-        var sites = SC_collect(layers, deep);
+        var sites = SC_filterSites(SC_collect(layers, deep), typeFilter);
         for (i = 0; i < sites.length; i++) {
             var site = sites[i];
             // Locked layers refuse edits; unlock for the duration, relock after.
@@ -409,14 +442,14 @@ function SC_apply(oldHex, newHex, deep) {
 }
 
 /* Narrow the layer selection to layers that use hex (like Figma's "select matching layers"). */
-function SC_selectMatching(hex, deep) {
+function SC_selectMatching(hex, deep, typeFilter) {
     hex = String(hex).toUpperCase();
     try {
         var comp = SC_activeComp();
         if (!comp) { return SC_json({ ok: false, error: "No active composition" }); }
         var layers = SC_selectedLayers(comp), keep = [], i, j;
         for (i = 0; i < layers.length; i++) {
-            var sites = SC_collect([layers[i]], deep), hit = false;
+            var sites = SC_filterSites(SC_collect([layers[i]], deep), typeFilter), hit = false;
             for (j = 0; j < sites.length && !hit; j++) {
                 if (SC_contains(SC_siteHexes(sites[j]), hex)) { hit = true; }
             }

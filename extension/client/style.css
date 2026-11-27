@@ -55,6 +55,15 @@ button:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; bo
 .tool.spin svg { animation: spin .5s linear; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
+.tool-select {
+  height: 24px; max-width: 92px; padding: 0 4px; border-radius: 4px;
+  background: none; border: 0; color: var(--muted); font: inherit;
+  text-overflow: ellipsis;
+}
+.tool-select:hover { background: var(--row); color: var(--text); }
+.tool-select:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; }
+.tool-select option { background: var(--bg); color: var(--text); }
+
 .list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 
 .row { display: flex; align-items: stretch; height: 32px; gap: 1px; position: relative; }

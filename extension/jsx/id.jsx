@@ -143,6 +143,22 @@ function SC_getOpac(o) {
     try { return SC_r2(o.transparencySettings.blendingSettings.opacity); } catch (e) { return null; }
 }
 
+/* Rough object-type bucket, for the panel's type filter. */
+function SC_siteType(site) {
+    if (site.t === "text") { return "text"; }
+    var o = SC_siteOwner(site);
+    if (o && SC_SHAPES[SC_cn(o)]) { return "shape"; }
+    return "other";
+}
+
+/* typeFilter: "" / "all" = no filtering. */
+function SC_filterSites(sites, typeFilter) {
+    if (!typeFilter || typeFilter === "all") { return sites; }
+    var out = [];
+    for (var i = 0; i < sites.length; i++) { if (SC_siteType(sites[i]) === typeFilter) { out.push(sites[i]); } }
+    return out;
+}
+
 function SC_isTextSel(o) {
     var cn = SC_cn(o);
     return cn === "Text" || cn === "Character" || cn === "Word" || cn === "Line" || cn === "Paragraph" ||
@@ -321,12 +337,17 @@ function SC_fingerprint() {
     } catch (e) { return "err:" + e.toString(); }
 }
 
-function SC_scan(deep) {
+function SC_scan(deep, typeFilter) {
     try {
         if (!SC_isDoc()) { return SC_json({ status: "nodoc", colors: [] }); }
         var got = SC_collectSelection();
         if (!got.text && got.items.length === 0) { return SC_json({ status: "nosel", colors: [] }); }
-        var t0 = new Date().getTime(), map = {}, list = [], partial = false, i, j, sites = got.ctx.sites;
+
+        var typesPresent = {}, ti;
+        for (ti = 0; ti < got.ctx.sites.length; ti++) { typesPresent[SC_siteType(got.ctx.sites[ti])] = true; }
+
+        var t0 = new Date().getTime(), map = {}, list = [], partial = false, i, j;
+        var sites = SC_filterSites(got.ctx.sites, typeFilter);
         for (i = 0; i < sites.length; i++) {
             if (new Date().getTime() - t0 > SC_SCAN_BUDGET_MS) { partial = true; break; }
             var ds = SC_siteDescs(sites[i]);
@@ -351,15 +372,18 @@ function SC_scan(deep) {
             delete list[i].opMin; delete list[i].opMax;
         }
         list.sort(function (a, b) { return (b.count - a.count) || (a.order - b.order); });
-        return SC_json({ status: "ok", layers: got.items.length, colors: list, partial: partial });
+        var types = [];
+        for (var k in typesPresent) { if (typesPresent.hasOwnProperty(k)) { types.push(k); } }
+        return SC_json({ status: "ok", layers: got.items.length, colors: list, partial: partial, types: types });
     } catch (err) {
         return SC_json({ status: "error", error: err.toString() + (err.line ? " (line " + err.line + ")" : ""), colors: [] });
     }
 }
 
-function SC_applyImpl(oldKey, newHex, targetKey) {
+function SC_applyImpl(oldKey, newHex, targetKey, typeFilter) {
     var doc = app.activeDocument, got = SC_collectSelection();
     if (!got.text && got.items.length === 0) { return { ok: false, error: "Nothing selected" }; }
+    got.ctx.sites = SC_filterSites(got.ctx.sites, typeFilter);
 
     var color = null, tint = 100, target = targetKey ? SC_fromKey(doc, targetKey) : null;
     if (target) {
@@ -385,14 +409,14 @@ function SC_applyImpl(oldKey, newHex, targetKey) {
     return { ok: true, changed: changed, failed: failed, error: firstError, id: newKey };
 }
 
-function SC_apply(oldKey, newHex, deep, targetKey) {
+function SC_apply(oldKey, newHex, deep, targetKey, typeFilter) {
     oldKey = String(oldKey);
     newHex = String(newHex).toUpperCase();
     if (!SC_isHex6(newHex)) { return SC_json({ ok: false, error: "Invalid hex" }); }
     if (!SC_isDoc()) { return SC_json({ ok: false, error: "No open document" }); }
     var result = null;
     try {
-        app.doScript(function () { result = SC_applyImpl(oldKey, newHex, targetKey); },
+        app.doScript(function () { result = SC_applyImpl(oldKey, newHex, targetKey, typeFilter); },
             ScriptLanguage.JAVASCRIPT, undefined, UndoModes.ENTIRE_SCRIPT, "Selection Colors");
     } catch (e) {
         if (!result) { result = { ok: false, error: e.toString() }; }
@@ -401,10 +425,10 @@ function SC_apply(oldKey, newHex, deep, targetKey) {
 }
 
 /* Sets opacity (0-100) on every distinct object behind this colour in the selection. */
-function SC_setOpacityImpl(key, opacity) {
+function SC_setOpacityImpl(key, opacity, typeFilter) {
     var got = SC_collectSelection();
     if (!got.text && got.items.length === 0) { return { ok: false, error: "Nothing selected" }; }
-    var sites = got.ctx.sites, seen = {}, changed = 0, unlocked = [], i, j;
+    var sites = SC_filterSites(got.ctx.sites, typeFilter), seen = {}, changed = 0, unlocked = [], i, j;
     try {
         for (i = 0; i < sites.length; i++) {
             var ds = SC_siteDescs(sites[i]), match = false;
@@ -424,13 +448,13 @@ function SC_setOpacityImpl(key, opacity) {
     }
     return { ok: true, changed: changed };
 }
-function SC_setOpacity(key, opacity) {
+function SC_setOpacity(key, opacity, typeFilter) {
     key = String(key);
     opacity = Math.max(0, Math.min(100, Math.round(Number(opacity))));
     if (!SC_isDoc()) { return SC_json({ ok: false, error: "No open document" }); }
     var result = null;
     try {
-        app.doScript(function () { result = SC_setOpacityImpl(key, opacity); },
+        app.doScript(function () { result = SC_setOpacityImpl(key, opacity, typeFilter); },
             ScriptLanguage.JAVASCRIPT, undefined, UndoModes.ENTIRE_SCRIPT, "Selection Colors Opacity");
     } catch (e) {
         if (!result) { result = { ok: false, error: e.toString() }; }
@@ -438,7 +462,7 @@ function SC_setOpacity(key, opacity) {
     return SC_json(result || { ok: false, error: "No result" });
 }
 
-function SC_selectMatching(key, deep) {
+function SC_selectMatching(key, deep, typeFilter) {
     key = String(key);
     try {
         if (!SC_isDoc()) { return SC_json({ ok: false, error: "No open document" }); }
@@ -448,8 +472,9 @@ function SC_selectMatching(key, deep) {
             if (SC_isTextSel(sel[i]) || SC_cn(sel[i]) === "InsertionPoint") { return SC_json({ ok: true, selected: 0 }); }
             var ctx = SC_newCtx(), hit = false;
             SC_visitItem(sel[i], ctx, true);
-            for (j = 0; j < ctx.sites.length && !hit; j++) {
-                var ds = SC_siteDescs(ctx.sites[j]);
+            var sites = SC_filterSites(ctx.sites, typeFilter);
+            for (j = 0; j < sites.length && !hit; j++) {
+                var ds = SC_siteDescs(sites[j]);
                 for (k = 0; k < ds.length; k++) { if (ds[k].key === key) { hit = true; break; } }
             }
             if (hit) { keep.push(sel[i]); }

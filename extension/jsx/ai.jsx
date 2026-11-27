@@ -214,6 +214,22 @@ function SC_ownerKey(o) {
     try { return o.uuid || (SC_tn(o) + ":" + o.left + "," + o.top); } catch (e) { return null; }
 }
 
+/* Rough object-type bucket, for the panel's type filter. */
+function SC_siteType(site) {
+    var o = SC_siteOwner(site), tn = o ? SC_tn(o) : "";
+    if (tn === "TextFrame") { return "text"; }
+    if (tn === "PathItem" || tn === "CompoundPathItem") { return "shape"; }
+    return "other";
+}
+
+/* typeFilter: "" / "all" = no filtering. */
+function SC_filterSites(sites, typeFilter) {
+    if (!typeFilter || typeFilter === "all") { return sites; }
+    var out = [];
+    for (var i = 0; i < sites.length; i++) { if (SC_siteType(sites[i]) === typeFilter) { out.push(sites[i]); } }
+    return out;
+}
+
 /* Selection -> sites. Handles object selections and Type-tool text selections. */
 function SC_collectSelection(doc) {
     var ctx = SC_newCtx(), sel = null;
@@ -343,14 +359,17 @@ function SC_fingerprint() {
     } catch (e) { return "err:" + e.toString(); }
 }
 
-function SC_scan(deep) {
+function SC_scan(deep, typeFilter) {
     try {
         if (!SC_isDoc()) { return SC_json({ status: "nodoc", colors: [] }); }
         var doc = app.activeDocument, got = SC_collectSelection(doc);
         if (!got.text && got.items.length === 0) { return SC_json({ status: "nosel", colors: [] }); }
 
+        var typesPresent = {}, ti;
+        for (ti = 0; ti < got.ctx.sites.length; ti++) { typesPresent[SC_siteType(got.ctx.sites[ti])] = true; }
+
         var t0 = new Date().getTime(), map = {}, list = [], partial = false, i, j;
-        var sites = got.ctx.sites;
+        var sites = SC_filterSites(got.ctx.sites, typeFilter);
         for (i = 0; i < sites.length; i++) {
             if (new Date().getTime() - t0 > SC_SCAN_BUDGET_MS) { partial = true; break; }
             var ds = SC_siteDescs(sites[i]);
@@ -375,13 +394,15 @@ function SC_scan(deep) {
             delete list[i].opMin; delete list[i].opMax;
         }
         list.sort(function (a, b) { return (b.count - a.count) || (a.order - b.order); });
-        return SC_json({ status: "ok", layers: got.items.length, colors: list, partial: partial });
+        var types = [];
+        for (var k in typesPresent) { if (typesPresent.hasOwnProperty(k)) { types.push(k); } }
+        return SC_json({ status: "ok", layers: got.items.length, colors: list, partial: partial, types: types });
     } catch (err) {
         return SC_json({ status: "error", error: err.toString() + (err.line ? " (line " + err.line + ")" : ""), colors: [] });
     }
 }
 
-function SC_apply(oldKey, newHex, deep, targetKey) {
+function SC_apply(oldKey, newHex, deep, targetKey, typeFilter) {
     oldKey = String(oldKey);
     newHex = String(newHex).toUpperCase();
     if (!SC_isHex6(newHex)) { return SC_json({ ok: false, error: "Invalid hex" }); }
@@ -394,7 +415,7 @@ function SC_apply(oldKey, newHex, deep, targetKey) {
     var nd = SC_desc(color), newKey = nd ? nd.key : "";
     if (newKey === oldKey) { return SC_json({ ok: true, changed: 0, failed: 0, id: newKey }); }
 
-    var sites = got.ctx.sites, changed = 0, failed = 0, firstError = "", unlocked = [], i;
+    var sites = SC_filterSites(got.ctx.sites, typeFilter), changed = 0, failed = 0, firstError = "", unlocked = [], i;
     try {
         for (i = 0; i < sites.length; i++) {
             SC_unlockFor(sites[i], unlocked);
@@ -413,13 +434,13 @@ function SC_apply(oldKey, newHex, deep, targetKey) {
 }
 
 /* Sets opacity (0-100) on every distinct object behind this colour in the selection. */
-function SC_setOpacity(key, opacity) {
+function SC_setOpacity(key, opacity, typeFilter) {
     key = String(key);
     opacity = Math.max(0, Math.min(100, Math.round(Number(opacity))));
     if (!SC_isDoc()) { return SC_json({ ok: false, error: "No open document" }); }
     var doc = app.activeDocument, got = SC_collectSelection(doc);
     if (!got.text && got.items.length === 0) { return SC_json({ ok: false, error: "Nothing selected" }); }
-    var sites = got.ctx.sites, seen = {}, changed = 0, i, j;
+    var sites = SC_filterSites(got.ctx.sites, typeFilter), seen = {}, changed = 0, i, j;
     for (i = 0; i < sites.length; i++) {
         var ds = SC_siteDescs(sites[i]), match = false;
         for (j = 0; j < ds.length; j++) { if (ds[j].key === key) { match = true; break; } }
@@ -436,7 +457,7 @@ function SC_setOpacity(key, opacity) {
 }
 
 /* Narrow the selection to objects using this colour (like Figma's "select matching layers"). */
-function SC_selectMatching(key, deep) {
+function SC_selectMatching(key, deep, typeFilter) {
     key = String(key);
     try {
         if (!SC_isDoc()) { return SC_json({ ok: false, error: "No open document" }); }
@@ -447,8 +468,9 @@ function SC_selectMatching(key, deep) {
         for (i = 0; i < items.length; i++) {
             var ctx = SC_newCtx(), hit = false;
             SC_visitItem(items[i], ctx);
-            for (j = 0; j < ctx.sites.length && !hit; j++) {
-                var ds = SC_siteDescs(ctx.sites[j]);
+            var sites = SC_filterSites(ctx.sites, typeFilter);
+            for (j = 0; j < sites.length && !hit; j++) {
+                var ds = SC_siteDescs(sites[j]);
                 for (k = 0; k < ds.length; k++) { if (ds[k].key === key) { hit = true; break; } }
             }
             if (hit) { keep.push(items[i]); }
