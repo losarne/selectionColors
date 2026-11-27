@@ -8,12 +8,11 @@ INSTALL - WINDOWS
 
 INSTALL - MAC
   1. Quit After Effects, Illustrator and InDesign.
-  2. Double-click install_mac.command (a Terminal window opens and does the rest).
-     If macOS says it "cannot be opened" / "unidentified developer":
-       right-click the file > Open > Open.
-       (macOS 15+: System Settings > Privacy & Security > scroll down > "Open Anyway".)
-     Or skip the warning entirely: open Terminal, type  bash  and a space,
-       drag install_mac.command into the window, press Enter.
+  2. Open Terminal, type  bash  and a space, drag install_mac.command into the window, press Enter.
+     (This skips the "cannot be opened / unidentified developer" warning entirely, since the file
+     isn't a signed, notarized app - there's no way around that warning if you instead double-click it.
+     If you'd rather double-click it: right-click the file > Open > Open
+     (macOS 15+: System Settings > Privacy & Security > scroll down > "Open Anyway").)
   3. Start the app  ->  Window > Extensions > Selection Colors
 
   Updating: just run the installer again - it replaces the old version.
