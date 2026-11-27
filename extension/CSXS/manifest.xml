@@ -39,6 +39,7 @@
           <Geometry>
             <Size><Height>360</Height><Width>280</Width></Size>
             <MinSize><Height>120</Height><Width>200</Width></MinSize>
+            <MaxSize><Height>2000</Height><Width>1200</Width></MaxSize>
           </Geometry>
         </UI>
       </DispatchInfo>
