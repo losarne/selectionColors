@@ -224,16 +224,6 @@
       if (e.detail === 0) { togglePicker(row, c); }   // keyboard (Enter/Space)
     });
 
-    var op = document.createElement("input");
-    op.className = "opacity";
-    op.type = "text";
-    op.inputMode = "numeric";
-    op.maxLength = 3;
-    op.placeholder = "–";
-    op.value = (typeof c.opacity === "number") ? String(Math.round(c.opacity)) : "";
-    op.setAttribute("aria-label", "Opacity percent");
-    wireOpacityInput(op, c.opacity, c.id || c.hex);
-
     var input = document.createElement("input");
     input.className = "hex";
     input.type = "text";
@@ -244,9 +234,19 @@
     input.setAttribute("aria-label", "Hex colour " + c.hex);
     wireHexInput(input, c.hex, c.id || c.hex);
 
+    var op = document.createElement("input");
+    op.className = "opacity";
+    op.type = "text";
+    op.inputMode = "numeric";
+    op.maxLength = 4;
+    op.placeholder = "–";
+    op.value = (typeof c.opacity === "number") ? Math.round(c.opacity) + "%" : "";
+    op.setAttribute("aria-label", "Opacity percent");
+    wireOpacityInput(op, c.opacity, c.id || c.hex);
+
     main.appendChild(sw);
-    main.appendChild(op);
     main.appendChild(input);
+    main.appendChild(op);
 
     var count = document.createElement("div");
     count.className = "cell count";
@@ -328,7 +328,7 @@
       else if (e.key === "Escape") {
         e.preventDefault();
         done = true;
-        input.value = (typeof original === "number") ? String(Math.round(original)) : "";
+        input.value = (typeof original === "number") ? Math.round(original) + "%" : "";
         input.blur();
       }
     });
@@ -341,17 +341,17 @@
     function commit() {
       if (done) { return; }
       done = true;
-      var raw = String(input.value).trim();
+      var raw = String(input.value).replace(/[^\d.]/g, "").trim();
       if (raw === "") { input.blur(); return; }
       var n = parseInt(raw, 10);
       if (isNaN(n)) {
-        input.value = (typeof original === "number") ? String(Math.round(original)) : "";
+        input.value = (typeof original === "number") ? Math.round(original) + "%" : "";
         input.blur();
         toast("Not a valid opacity");
         return;
       }
       n = Math.max(0, Math.min(100, n));
-      input.value = String(n);
+      input.value = n + "%";
       input.blur();
       if (n !== original) { applyOpacity(id, n); }
     }
