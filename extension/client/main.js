@@ -148,7 +148,7 @@
 
   function editingInList() {
     var a = document.activeElement;
-    return !!(a && a.classList && a.classList.contains("hex") && els.list.contains(a));
+    return !!(a && a.classList && (a.classList.contains("hex") || a.classList.contains("opacity")) && els.list.contains(a));
   }
 
   function render() {
@@ -224,6 +224,16 @@
       if (e.detail === 0) { togglePicker(row, c); }   // keyboard (Enter/Space)
     });
 
+    var op = document.createElement("input");
+    op.className = "opacity";
+    op.type = "text";
+    op.inputMode = "numeric";
+    op.maxLength = 3;
+    op.placeholder = "–";
+    op.value = (typeof c.opacity === "number") ? String(Math.round(c.opacity)) : "";
+    op.setAttribute("aria-label", "Opacity percent");
+    wireOpacityInput(op, c.opacity, c.id || c.hex);
+
     var input = document.createElement("input");
     input.className = "hex";
     input.type = "text";
@@ -235,6 +245,7 @@
     wireHexInput(input, c.hex, c.id || c.hex);
 
     main.appendChild(sw);
+    main.appendChild(op);
     main.appendChild(input);
 
     var count = document.createElement("div");
@@ -298,6 +309,51 @@
       input.value = next;
       input.blur();
       if (next !== original) { applyColor(id, next); }
+    }
+  }
+
+  function wireOpacityInput(input, original, id) {
+    var done = false;
+
+    input.addEventListener("focus", function () {
+      done = false;
+      setTimeout(function () {
+        if (document.activeElement === input && !done) { try { input.select(); } catch (e) {} }
+      }, 0);
+    });
+
+    input.addEventListener("keydown", function (e) {
+      e.stopPropagation();
+      if (e.key === "Enter") { e.preventDefault(); commit(); }
+      else if (e.key === "Escape") {
+        e.preventDefault();
+        done = true;
+        input.value = (typeof original === "number") ? String(Math.round(original)) : "";
+        input.blur();
+      }
+    });
+
+    input.addEventListener("blur", function () {
+      if (!done) { commit(); }
+      if (state.pendingRender) { setTimeout(render, 0); }
+    });
+
+    function commit() {
+      if (done) { return; }
+      done = true;
+      var raw = String(input.value).trim();
+      if (raw === "") { input.blur(); return; }
+      var n = parseInt(raw, 10);
+      if (isNaN(n)) {
+        input.value = (typeof original === "number") ? String(Math.round(original)) : "";
+        input.blur();
+        toast("Not a valid opacity");
+        return;
+      }
+      n = Math.max(0, Math.min(100, n));
+      input.value = String(n);
+      input.blur();
+      if (n !== original) { applyOpacity(id, n); }
     }
   }
 
