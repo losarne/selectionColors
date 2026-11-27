@@ -753,6 +753,15 @@
     cep.addEventListener("com.adobe.csxs.events.ThemeColorChanged", applyTheme);
   } catch (e) { /* older CEP */ }
 
+  try {
+    var flyout = '<Menu><MenuItem Id="reload" Label="Reload Panel" Enabled="true" Checked="false"/></Menu>';
+    cep.invokeSync("setPanelFlyoutMenu", JSON.stringify({ extensionId: cep.getExtensionId(), menu: flyout }));
+    cep.addEventListener("com.adobe.csxs.events.flyoutMenuClicked", function (e) {
+      var id = e && e.data && (e.data.menuId || e.data.menuName);
+      if (id === "reload") { window.location.reload(); }
+    });
+  } catch (e) { /* host doesn't support flyout menus */ }
+
   boot();
   checkForUpdate();
 })();
