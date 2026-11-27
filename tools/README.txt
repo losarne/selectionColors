@@ -1,4 +1,4 @@
-SELECTION COLORS for After Effects, Illustrator and InDesign  (v1.5.2)
+SELECTION COLORS for After Effects, Illustrator and InDesign  (v1.5.3)
 Figma's "Selection colors" module, as a panel for AE 2022+, Illustrator 2022+ and InDesign 2022+.
 
 INSTALL - WINDOWS
@@ -16,6 +16,18 @@ INSTALL - MAC
   3. Start the app  ->  Window > Extensions > Selection Colors
 
   Updating: just run the installer again - it replaces the old version.
+
+  MANUAL INSTALL - MAC (if install_mac.command won't run at all, e.g. "appropriate access privileges")
+  1. Quit After Effects, Illustrator and InDesign.
+  2. Open Terminal and run, once:
+       for v in 9 10 11 12 13 14; do defaults write "com.adobe.CSXS.$v" PlayerDebugMode 1; done
+  3. In Finder, copy the SelectionColors folder (the one next to this README, containing CSXS/client/jsx/native)
+     to:  ~/Library/Application Support/Adobe/CEP/extensions/
+     (Go menu > Go to Folder..., paste that path, create "extensions" if it's missing, then drop the
+     SelectionColors folder inside it. Replace any existing SelectionColors folder there.)
+  4. In Terminal, run (fixes a "cannot be opened" warning on the eyedropper later):
+       xattr -dr com.apple.quarantine ~/Library/Application\ Support/Adobe/CEP/extensions/SelectionColors
+  5. Start the app  ->  Window > Extensions > Selection Colors
 
 USE
   AE: select layers in a comp.
