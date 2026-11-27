@@ -59,7 +59,7 @@ button:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; bo
 
 .row { display: flex; align-items: stretch; height: 32px; gap: 1px; position: relative; }
 .cell { background: var(--row); display: flex; align-items: center; }
-.cell.main { flex: 1 1 auto; min-width: 0; border-radius: 5px 0 0 5px; padding-left: 8px; gap: 8px; }
+.cell.main { flex: 1 1 auto; min-width: 0; border-radius: 5px 0 0 5px; padding: 0 8px; gap: 8px; }
 .cell.count {
   flex: 0 0 auto; width: 56px; border-radius: 0 5px 5px 0;
   justify-content: space-between; padding: 0 8px 0 10px;
