@@ -67,7 +67,7 @@ button:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; bo
 .row:hover .cell { background: var(--row-hover); }
 
 .swatch {
-  flex: 0 0 auto; width: 14px; height: 14px; border-radius: 2px;
+  flex: 0 0 auto; width: 18px; height: 18px; border-radius: 3px;
   box-shadow: inset 0 0 0 1px var(--swatch-edge);
 }
 .swatch:hover { box-shadow: inset 0 0 0 1px var(--swatch-edge), 0 0 0 1px var(--muted); }

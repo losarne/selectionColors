@@ -1,4 +1,4 @@
-SELECTION COLORS for After Effects, Illustrator and InDesign  (v1.5.4)
+SELECTION COLORS for After Effects, Illustrator and InDesign  (v1.5.5)
 Figma's "Selection colors" module, as a panel for AE 2022+, Illustrator 2022+ and InDesign 2022+.
 
 INSTALL - WINDOWS
