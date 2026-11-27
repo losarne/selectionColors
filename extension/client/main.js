@@ -462,6 +462,164 @@
     return job;
   }
 
+  /* ---------------------------------------------- self-update */
+
+  var UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/losarne/selectionColors/main/latest.json";
+
+  function nodeBuffer() {
+    try { return nodeRequire()("buffer").Buffer; } catch (e) { return null; }
+  }
+
+  function compareVersions(a, b) {
+    var pa = String(a || "0").split("."), pb = String(b || "0").split(".");
+    var n = Math.max(pa.length, pb.length);
+    for (var i = 0; i < n; i++) {
+      var x = parseInt(pa[i], 10) || 0, y = parseInt(pb[i], 10) || 0;
+      if (x !== y) { return x > y ? 1 : -1; }
+    }
+    return 0;
+  }
+
+  function currentVersion() {
+    try {
+      var fs = nodeRequire()("fs");
+      var xml = fs.readFileSync(extensionPath() + "/CSXS/manifest.xml", "utf8");
+      var m = /ExtensionBundleVersion="([^"]+)"/.exec(xml);
+      return m ? m[1] : "";
+    } catch (e) { return ""; }
+  }
+
+  /* GET a URL as a string, following redirects. */
+  function httpsGetText(url, redirectsLeft, cb) {
+    var https = nodeRequire()("https");
+    var req = https.get(url, { headers: { "User-Agent": "SelectionColors" } }, function (res) {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirectsLeft > 0) {
+        res.resume();
+        httpsGetText(res.headers.location, redirectsLeft - 1, cb);
+        return;
+      }
+      if (res.statusCode !== 200) { res.resume(); cb(new Error("HTTP " + res.statusCode)); return; }
+      var buf = "";
+      res.setEncoding("utf8");
+      res.on("data", function (d) { buf += d; });
+      res.on("end", function () { cb(null, buf); });
+    });
+    req.on("error", cb);
+    req.setTimeout(8000, function () { req.destroy(new Error("Timed out")); });
+  }
+
+  /* GET a URL as a Buffer, following redirects. */
+  function httpsGetBuffer(url, redirectsLeft, cb) {
+    var https = nodeRequire()("https");
+    var req = https.get(url, { headers: { "User-Agent": "SelectionColors" } }, function (res) {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirectsLeft > 0) {
+        res.resume();
+        httpsGetBuffer(res.headers.location, redirectsLeft - 1, cb);
+        return;
+      }
+      if (res.statusCode !== 200) { res.resume(); cb(new Error("HTTP " + res.statusCode)); return; }
+      var chunks = [];
+      res.on("data", function (d) { chunks.push(d); });
+      res.on("end", function () { cb(null, nodeBuffer().concat(chunks)); });
+    });
+    req.on("error", cb);
+    req.setTimeout(30000, function () { req.destroy(new Error("Timed out")); });
+  }
+
+  /* Minimal ZIP reader: central directory + stored/deflate entries, via zlib. */
+  function unzipBuffer(buf) {
+    var EOCD = 0x06054b50, CEN = 0x02014b50, LOC = 0x04034b50;
+    var end = -1, lo = Math.max(0, buf.length - 65557);
+    for (var p = buf.length - 22; p >= lo; p--) { if (buf.readUInt32LE(p) === EOCD) { end = p; break; } }
+    if (end < 0) { throw new Error("Not a zip file"); }
+    var count = buf.readUInt16LE(end + 10), cdOff = buf.readUInt32LE(end + 16);
+    var zlib = nodeRequire()("zlib"), out = [], p2 = cdOff, i;
+    for (i = 0; i < count; i++) {
+      if (buf.readUInt32LE(p2) !== CEN) { throw new Error("Bad zip central directory"); }
+      var method = buf.readUInt16LE(p2 + 10);
+      var compSize = buf.readUInt32LE(p2 + 20);
+      var nameLen = buf.readUInt16LE(p2 + 28), extraLen = buf.readUInt16LE(p2 + 30), commentLen = buf.readUInt16LE(p2 + 32);
+      var localOff = buf.readUInt32LE(p2 + 42);
+      var name = buf.toString("utf8", p2 + 46, p2 + 46 + nameLen);
+      if (!/\/$/.test(name)) {
+        if (buf.readUInt32LE(localOff) !== LOC) { throw new Error("Bad zip entry: " + name); }
+        var lNameLen = buf.readUInt16LE(localOff + 26), lExtraLen = buf.readUInt16LE(localOff + 28);
+        var dataStart = localOff + 30 + lNameLen + lExtraLen;
+        var comp = buf.slice(dataStart, dataStart + compSize);
+        var data = method === 0 ? comp : (method === 8 ? zlib.inflateRawSync(comp) : null);
+        if (!data) { throw new Error("Unsupported zip method for " + name); }
+        out.push({ path: name, data: data });
+      }
+      p2 += 46 + nameLen + extraLen + commentLen;
+    }
+    return out;
+  }
+
+  function writeExtractedFiles(files, destRoot) {
+    var fs = nodeRequire()("fs"), path = nodeRequire()("path");
+    for (var i = 0; i < files.length; i++) {
+      var full = path.join(destRoot, files[i].path);
+      fs.mkdirSync(path.dirname(full), { recursive: true });
+      fs.writeFileSync(full, files[i].data);
+    }
+  }
+
+  function renderUpdateBanner() {
+    var el = document.getElementById("update"), textEl = document.getElementById("updateText"), btn = document.getElementById("updateInstall");
+    if (!el || !textEl || !btn) { return; }
+    if (!state.update || state.updateDismissed) { el.hidden = true; return; }
+    el.hidden = false;
+    if (state.updateStatus === "downloading") { textEl.textContent = "Downloading update…"; }
+    else if (state.updateStatus === "error") { textEl.textContent = "Update failed: " + (state.updateError || "unknown error"); }
+    else if (state.updateStatus === "done") { textEl.textContent = "Updated to v" + state.update.version + ". Reloading…"; }
+    else { textEl.textContent = "Update available: v" + state.update.version + (state.update.notes ? " — " + state.update.notes : ""); }
+    btn.hidden = state.updateStatus === "downloading" || state.updateStatus === "done";
+    btn.textContent = state.updateStatus === "error" ? "Retry" : "Update";
+  }
+
+  function installUpdate() {
+    if (!state.update) { return; }
+    state.updateStatus = "downloading";
+    renderUpdateBanner();
+    httpsGetBuffer(state.update.url, 5, function (err, buf) {
+      if (err) { state.updateStatus = "error"; state.updateError = err.message; renderUpdateBanner(); return; }
+      try {
+        var crypto = nodeRequire()("crypto");
+        var hash = crypto.createHash("sha256").update(buf).digest("hex");
+        if (String(state.update.sha256 || "").toLowerCase() !== hash.toLowerCase()) { throw new Error("Checksum mismatch"); }
+        var files = unzipBuffer(buf);
+        writeExtractedFiles(files, extensionPath());
+      } catch (e) {
+        state.updateStatus = "error"; state.updateError = e.message; renderUpdateBanner(); return;
+      }
+      state.updateStatus = "done";
+      renderUpdateBanner();
+      setTimeout(function () { window.location.reload(); }, 900);
+    });
+  }
+
+  function checkForUpdate() {
+    if (!cep || !nodeRequire()) { return; }
+    var cur = currentVersion();
+    if (!cur) { return; }
+    httpsGetText(UPDATE_MANIFEST_URL, 3, function (err, text) {
+      if (err) { return; }
+      var info;
+      try { info = JSON.parse(text); } catch (e) { return; }
+      if (!info || !info.version || !info.url || compareVersions(info.version, cur) <= 0) { return; }
+      if (window.localStorage.getItem("sc.dismissedUpdateVersion") === info.version) { return; }
+      state.update = info;
+      renderUpdateBanner();
+    });
+  }
+
+  document.getElementById("updateInstall").addEventListener("click", installUpdate);
+  document.getElementById("updateDismiss").addEventListener("click", function () {
+    state.updateDismissed = true;
+    try { if (state.update) { window.localStorage.setItem("sc.dismissedUpdateVersion", state.update.version); } } catch (e) {}
+    renderUpdateBanner();
+  });
+
   function selectMatching(id) {
     enqueue(function () {
       return call("SC_selectMatching", [id, state.deep]).then(function (res) {
@@ -596,4 +754,5 @@
   } catch (e) { /* older CEP */ }
 
   boot();
+  checkForUpdate();
 })();

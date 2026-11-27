@@ -45,6 +45,20 @@ Next steps:
    inside the panel's ensureHost. Bisect with the probe.
 Not yet verified in real apps either: AE/AI behaviour after the 1.3 loader change, the Windows eyedropper (C# overlay), the macOS JXA eyedropper.
 
-## Requested next feature
-Self-update prompt in the panel: host `latest.json` {version, url, sha256, notes} (GitHub releases or Netlify),
-panel checks on start, shows "Update available - Install", downloads zip via Node, verifies sha256, replaces its own folder, asks to restart.
+## Self-update (implemented)
+The panel checks `latest.json` at repo root (raw.githubusercontent.com/losarne/selectionColors/main/latest.json)
+on every boot via Node's `https` (through the existing `cep_node` bridge, same path the eyedropper's `child_process`
+already uses - no manifest change needed). If `latest.json`'s `version` is newer than the installed
+`CSXS/manifest.xml` version, a banner offers "Update": downloads `url` with Node, verifies `sha256`, unzips in
+memory (`main.js`'s own minimal ZIP reader, stored+deflate via `zlib`), overwrites the extension folder, then
+`location.reload()`s the panel (this alone reloads the jsx too, since `ensureHost()` already re-evaluates the
+jsx files from disk on every boot - no host app restart needed).
+
+Cutting a release:
+1. Bump `ExtensionBundleVersion` in `extension/CSXS/manifest.xml`.
+2. Zip the *contents* of `extension/` directly (no wrapping folder) - e.g.
+   `Compress-Archive -Path extension\* -DestinationPath release.zip`.
+3. `Get-FileHash release.zip -Algorithm SHA256` for the checksum.
+4. Upload `release.zip` as a GitHub Release asset, copy its direct download URL.
+5. Edit `latest.json` at repo root: `{ "version": "<new>", "url": "<asset url>", "sha256": "<hash>", "notes": "<short>" }`, commit, push.
+Until `latest.json`'s `url`/`sha256` are filled in, the banner never appears (version compare is <= 0 or the fields are missing).

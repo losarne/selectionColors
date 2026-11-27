@@ -92,6 +92,22 @@ button:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; bo
 .empty { color: var(--muted); margin: 8px 0 0; }
 .empty.error { color: var(--danger); user-select: text; }
 
+.update {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--row); border-radius: 5px; padding: 6px 6px 6px 10px; margin-top: 6px;
+}
+.update[hidden] { display: none; }
+.update-text { flex: 1 1 auto; min-width: 0; margin: 0; }
+.update-actions { display: flex; align-items: center; gap: 2px; flex: 0 0 auto; }
+.update-btn {
+  height: 22px; padding: 0 10px; border-radius: 4px;
+  background: var(--focus); color: #fff; font-weight: 500; white-space: nowrap;
+}
+.update-btn:hover { filter: brightness(1.1); }
+.update-btn[hidden] { display: none; }
+.update-dismiss { width: 22px; height: 22px; border-radius: 4px; color: var(--muted); }
+.update-dismiss:hover { background: var(--row-hover); color: var(--text); }
+
 
 .toast {
   position: fixed; left: 12px; right: 12px; bottom: 10px;
