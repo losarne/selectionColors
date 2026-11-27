@@ -1,0 +1,15 @@
+<!doctype html><meta charset="utf-8"><title>Selection Colors - live panel probe</title>
+<p>Open with the host app running (PlayerDebugMode on). Ports: AE 8099, Illustrator 8098, InDesign 8097.
+Edit <code>PORT</code>, open this file in Chrome, see the console.</p>
+<script>
+const PORT = 8097;
+(async () => {
+  const targets = await (await fetch(`http://localhost:${PORT}/json`)).json();
+  const ws = new WebSocket(targets[0].webSocketDebuggerUrl); let id = 0; const pend = {};
+  ws.onmessage = m => { const d = JSON.parse(m.data); if (pend[d.id]) { pend[d.id](d); delete pend[d.id]; } };
+  await new Promise(r => ws.onopen = r);
+  const panel = e => new Promise(r => { const i = ++id; pend[i] = r; ws.send(JSON.stringify({ id: i, method: "Runtime.evaluate", params: { expression: e, awaitPromise: true, returnByValue: true } })); });
+  const host = async c => (await panel("new Promise(r => window.__adobe_cep__.evalScript(" + JSON.stringify(c) + ", r))")).result.result.value;
+  for (const c of ["1+1", "$.version", "app.name + ' ' + app.version", "typeof SC_scan", "SC_fingerprint()", "SC_scan(false)"]) console.log(c, "=>", await host(c));
+})();
+</script>

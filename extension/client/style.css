@@ -1,0 +1,203 @@
+:root {
+  --bg: #232323;
+  --row: #2c2c2c;
+  --row-hover: #333333;
+  --text: #e6e6e6;
+  --muted: #8f8f8f;
+  --focus: #0d99ff;
+  --swatch-edge: rgba(255, 255, 255, 0.14);
+  --danger: #f24822;
+}
+:root.light {
+  --bg: #ffffff;
+  --row: #f5f5f5;
+  --row-hover: #ececec;
+  --text: #1e1e1e;
+  --muted: #7a7a7a;
+  --swatch-edge: rgba(0, 0, 0, 0.12);
+}
+
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 11px/16px "Inter", "Segoe UI", -apple-system, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  overflow-x: hidden;
+}
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: default; }
+button:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; border-radius: 3px; }
+
+.section { padding: 8px 12px 12px; }
+
+.head { display: flex; align-items: center; justify-content: space-between; height: 28px; }
+.title { display: flex; align-items: center; gap: 6px; font-weight: 600; height: 24px; }
+.chev { color: var(--muted); transition: transform .12s ease; }
+.section.collapsed .chev { transform: rotate(-90deg); }
+.section.collapsed .body { display: none; }
+
+.tools { display: flex; gap: 2px; }
+.tool {
+  width: 24px; height: 24px; border-radius: 4px;
+  display: grid; place-items: center; color: var(--muted);
+}
+.tool:hover { background: var(--row); color: var(--text); }
+.tool[aria-pressed="true"] { color: var(--focus); background: var(--row); }
+.tool.spin svg { animation: spin .5s linear; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.list { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+
+.row { display: flex; align-items: stretch; height: 32px; gap: 1px; position: relative; }
+.cell { background: var(--row); display: flex; align-items: center; }
+.cell.main { flex: 1 1 auto; min-width: 0; border-radius: 5px 0 0 5px; padding-left: 8px; gap: 8px; }
+.cell.count {
+  flex: 0 0 auto; width: 56px; border-radius: 0 5px 5px 0;
+  justify-content: space-between; padding: 0 8px 0 10px;
+}
+.row:hover .cell { background: var(--row-hover); }
+
+.swatch {
+  flex: 0 0 auto; width: 14px; height: 14px; border-radius: 2px;
+  box-shadow: inset 0 0 0 1px var(--swatch-edge);
+}
+.swatch:hover { box-shadow: inset 0 0 0 1px var(--swatch-edge), 0 0 0 1px var(--muted); }
+
+.hex {
+  flex: 1 1 auto; min-width: 0; height: 24px;
+  background: transparent; border: 1px solid transparent; border-radius: 3px;
+  color: var(--text); font: inherit; letter-spacing: .02em;
+  padding: 0 4px; margin-left: -5px; text-transform: uppercase;
+  user-select: text;
+}
+.hex:hover { border-color: var(--swatch-edge); }
+.hex:focus { outline: none; border-color: var(--focus); background: var(--bg); }
+
+.num { font-variant-numeric: tabular-nums; }
+.unit { color: var(--muted); }
+
+.match {
+  position: absolute; right: 4px; top: 4px; width: 24px; height: 24px;
+  display: none; place-items: center; color: var(--muted); border-radius: 4px;
+  background: var(--row-hover);
+}
+.row:hover .match { display: grid; }
+.row:hover .cell.count .num,
+.row:hover .cell.count .unit { visibility: hidden; }
+.match:hover { color: var(--text); }
+
+.empty { color: var(--muted); margin: 8px 0 0; }
+.empty.error { color: var(--danger); user-select: text; }
+
+
+.toast {
+  position: fixed; left: 12px; right: 12px; bottom: 10px;
+  padding: 6px 10px; border-radius: 5px;
+  background: #1e1e1e; color: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.35);
+  opacity: 0; transform: translateY(4px); transition: opacity .15s, transform .15s;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: none; }
+
+/* ------------------------------------------------------------ picker */
+:root { --pop: #2c2c2c; --pop-edge: rgba(255,255,255,.08); }
+:root.light { --pop: #ffffff; --pop-edge: rgba(0,0,0,.1); }
+
+.row.editing .cell { background: var(--row-hover); }
+.row.editing .swatch { box-shadow: inset 0 0 0 1px var(--swatch-edge), 0 0 0 1px var(--focus); }
+
+.picker {
+  position: fixed; z-index: 50;
+  background: var(--pop); border-radius: 8px;
+  box-shadow: 0 0 0 1px var(--pop-edge), 0 6px 24px rgba(0,0,0,.45);
+  display: flex; flex-direction: column;
+  max-height: calc(100vh - 12px);
+}
+.pk-head {
+  flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between;
+  height: 36px; padding: 0 6px 0 12px; border-bottom: 1px solid var(--pop-edge);
+}
+.pk-title { font-weight: 600; }
+.pk-x { width: 24px; height: 24px; }
+.pk-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 12px; padding: 12px;
+}
+.pk-body > * { flex-shrink: 0; }   /* scroll instead of squashing the square */
+.pk-foot {
+  flex: 0 0 auto; display: flex; justify-content: flex-end;
+  padding: 8px 12px; border-top: 1px solid var(--pop-edge);
+}
+.pk-done {
+  height: 24px; padding: 0 12px; border-radius: 5px;
+  background: var(--focus); color: #fff; font-weight: 500;
+}
+.pk-done:hover { filter: brightness(1.1); }
+.pk-status { color: var(--muted); margin-top: -4px; }
+.pk-status.error { color: var(--danger); user-select: text; }
+.pk-status[hidden] { display: none; }
+.pk-eye.active { color: var(--focus); background: var(--row); }
+.picker[hidden] { display: none; }
+
+.sv {
+  position: relative; height: 148px; border-radius: 4px; cursor: crosshair; touch-action: none;
+  outline: none;
+}
+.sv-w, .sv-b { position: absolute; top: 0; left: 0; right: 0; bottom: 0; border-radius: 4px; pointer-events: none; }
+.sv-w { background: linear-gradient(to right, #fff, rgba(255,255,255,0)); }
+.sv-b { background: linear-gradient(to top, #000, rgba(0,0,0,0)); box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+
+.knob {
+  position: absolute; width: 14px; height: 14px; border-radius: 50%;
+  transform: translate(-50%, -50%); pointer-events: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 3px rgba(0,0,0,.25), inset 0 0 0 1px rgba(0,0,0,.15);
+}
+.sv:focus-visible .sv-knob, .hue:focus-visible .hue-knob { box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--focus); }
+
+.pk-row { display: flex; align-items: center; gap: 8px; }
+.hue {
+  position: relative; flex: 1; height: 12px; border-radius: 6px; cursor: pointer; touch-action: none; outline: none;
+  background: linear-gradient(to right, #f00 0%, #ff0 16.66%, #0f0 33.33%, #0ff 50%, #00f 66.66%, #f0f 83.33%, #f00 100%);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,.12);
+  margin: 0 6px;
+}
+.hue-knob { top: 50%; width: 12px; height: 12px; }
+
+.pk-fields { display: grid; grid-template-columns: 1.9fr 1fr 1fr 1fr; gap: 4px; }
+.pk-f { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.pk-f input {
+  width: 100%; height: 24px; text-align: center;
+  background: var(--bg); color: var(--text); border: 1px solid transparent; border-radius: 4px;
+  font: inherit; font-variant-numeric: tabular-nums; padding: 0 2px; user-select: text;
+}
+.pk-hex input { text-transform: uppercase; letter-spacing: .02em; }
+.pk-f input:hover { border-color: var(--swatch-edge); }
+.pk-f input:focus { outline: none; border-color: var(--focus); }
+.pk-f span { color: var(--muted); font-size: 10px; line-height: 12px; }
+
+.pk-sw-wrap {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+  border-top: 1px solid var(--pop-edge); padding: 10px 12px 0; margin: 0 -12px;
+}
+.pk-col { min-width: 0; }
+.pk-label { color: var(--muted); margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pk-note { font-size: 10px; }
+.pk-sw { display: flex; flex-wrap: wrap; gap: 5px; }
+.pk-empty { color: var(--muted); opacity: .7; }
+.pk-chip {
+  width: 16px; height: 16px; border-radius: 3px;
+  box-shadow: inset 0 0 0 1px var(--swatch-edge);
+}
+.pk-chip:hover { box-shadow: inset 0 0 0 1px var(--swatch-edge), 0 0 0 1px var(--muted); }
+
+/* Illustrator / InDesign have no precomps: hide that toggle */
+:root[data-host="ai"] #deep, :root[data-host="id"] #deep { display: none; }
+
+.retry {
+  margin-top: 8px; height: 24px; padding: 0 10px; border-radius: 5px;
+  background: var(--row); color: var(--text);
+}
+.retry:hover { background: var(--row-hover); }

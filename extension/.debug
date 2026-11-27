@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionList>
+  <Extension Id="no.arne.selectioncolors.panel">
+    <HostList>
+      <Host Name="AEFT" Port="8099" />
+      <Host Name="ILST" Port="8098" />
+      <Host Name="IDSN" Port="8097" />
+    </HostList>
+  </Extension>
+</ExtensionList>
