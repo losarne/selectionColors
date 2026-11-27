@@ -1,4 +1,4 @@
-SELECTION COLORS for After Effects, Illustrator and InDesign  (v1.5.3)
+SELECTION COLORS for After Effects, Illustrator and InDesign  (v1.5.4)
 Figma's "Selection colors" module, as a panel for AE 2022+, Illustrator 2022+ and InDesign 2022+.
 
 INSTALL - WINDOWS
@@ -8,12 +8,17 @@ INSTALL - WINDOWS
 
 INSTALL - MAC
   1. Quit After Effects, Illustrator and InDesign.
-  2. Open Terminal, type  bash  and a space, drag install_mac.command into the window, press Enter.
-     (This skips the "cannot be opened / unidentified developer" warning entirely, since the file
-     isn't a signed, notarized app - there's no way around that warning if you instead double-click it.
-     If you'd rather double-click it: right-click the file > Open > Open
-     (macOS 15+: System Settings > Privacy & Security > scroll down > "Open Anyway").)
+  2. Open Terminal and paste:
+       curl -fsSL https://raw.githubusercontent.com/losarne/selectionColors/main/install.sh | bash
+     (Installs straight from GitHub - no zip to download or double-click, so there's no Gatekeeper
+     warning and no "appropriate access privileges" error to run into.)
   3. Start the app  ->  Window > Extensions > Selection Colors
+
+  If you'd rather use the files in this folder instead of the one-liner above:
+  open Terminal, type  bash  and a space, drag install_mac.command into the window, press Enter.
+  (Double-clicking it instead will likely hit a Gatekeeper warning, or an "appropriate access
+  privileges" error since zips built on Windows lose the Mac executable bit - see MANUAL INSTALL
+  below if so.)
 
   Updating: just run the installer again - it replaces the old version.
 
