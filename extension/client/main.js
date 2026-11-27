@@ -335,6 +335,18 @@
     });
   }
 
+  function applyOpacity(id, opacity) {
+    return enqueue(function () {
+      setBusy(true);
+      return call("SC_setOpacity", [id, opacity]).then(function (res) {
+        var r = parse(res), ok = !!(r && r.ok);
+        if (!r) { toast(describeFailure(res)); } else if (!r.ok) { toast(r.error || "Could not change opacity"); }
+        setBusy(false);
+        return scan(true).then(function () { return { ok: ok }; });
+      }, function () { setBusy(false); return { ok: false }; });
+    });
+  }
+
   /* ---------------------------------------------------------- picker */
 
   function findRow(id, hex) {
@@ -350,8 +362,9 @@
     var P = window.SCPicker, id = c.id || c.hex;
     if (!P) { return; }
     if (P.isOpen() && P.current() === id) { P.close(); return; }
-    P.open(row, { id: id, hex: c.hex }, {
+    P.open(row, { id: id, hex: c.hex, opacity: c.opacity }, {
       onCommit: applyColor,
+      onOpacityCommit: applyOpacity,
       findRow: findRow,
       projectLabel: TEXT.project,
       onPreview: function (appliedId, previewHex) {

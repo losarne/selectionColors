@@ -200,6 +200,14 @@ button:focus-visible { outline: 1px solid var(--focus); outline-offset: -1px; bo
 .pk-f input:focus { outline: none; border-color: var(--focus); }
 .pk-f span { color: var(--muted); font-size: 10px; line-height: 12px; }
 
+.pk-opacity-row {
+  flex-direction: row; align-items: center; justify-content: space-between; gap: 8px;
+  margin-top: -4px;
+}
+.pk-opacity-row input { width: 52px; flex: 0 0 auto; }
+.pk-opacity-row span { order: -1; font-size: 11px; line-height: 16px; }
+:root[data-host="ae"] .pk-opacity-row { display: none; }
+
 .pk-sw-wrap {
   display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
   border-top: 1px solid var(--pop-edge); padding: 10px 12px 0; margin: 0 -12px;

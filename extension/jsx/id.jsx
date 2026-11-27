@@ -133,6 +133,16 @@ function SC_visitItem(item, ctx, withText) {
 
 function SC_newCtx() { return { sites: [], grads: {} }; }
 
+/* The object a site's opacity lives on (null for gradient stops and bare text-selection sites). */
+function SC_siteOwner(site) {
+    if (site.t === "paint") { return site.item; }
+    if (site.t === "text") { return site.owner; }
+    return null;
+}
+function SC_getOpac(o) {
+    try { return SC_r2(o.transparencySettings.blendingSettings.opacity); } catch (e) { return null; }
+}
+
 function SC_isTextSel(o) {
     var cn = SC_cn(o);
     return cn === "Text" || cn === "Character" || cn === "Word" || cn === "Line" || cn === "Paragraph" ||
@@ -320,16 +330,25 @@ function SC_scan(deep) {
         for (i = 0; i < sites.length; i++) {
             if (new Date().getTime() - t0 > SC_SCAN_BUDGET_MS) { partial = true; break; }
             var ds = SC_siteDescs(sites[i]);
+            var owner = SC_siteOwner(sites[i]), op = owner ? SC_getOpac(owner) : null;
             for (j = 0; j < ds.length; j++) {
                 var d = ds[j], e = map["k" + d.key];
                 if (!e) {
-                    e = { id: d.key, hex: d.hex, label: d.label, count: 0, order: list.length, cats: {} };
+                    e = { id: d.key, hex: d.hex, label: d.label, count: 0, order: list.length, cats: {}, opMin: null, opMax: null };
                     map["k" + d.key] = e;
                     list.push(e);
                 }
                 e.count++;
                 e.cats[sites[i].cat] = (e.cats[sites[i].cat] || 0) + 1;
+                if (op !== null) {
+                    e.opMin = e.opMin === null ? op : Math.min(e.opMin, op);
+                    e.opMax = e.opMax === null ? op : Math.max(e.opMax, op);
+                }
             }
+        }
+        for (i = 0; i < list.length; i++) {
+            list[i].opacity = (list[i].opMin !== null && list[i].opMin === list[i].opMax) ? list[i].opMin : null;
+            delete list[i].opMin; delete list[i].opMax;
         }
         list.sort(function (a, b) { return (b.count - a.count) || (a.order - b.order); });
         return SC_json({ status: "ok", layers: got.items.length, colors: list, partial: partial });
@@ -375,6 +394,44 @@ function SC_apply(oldKey, newHex, deep, targetKey) {
     try {
         app.doScript(function () { result = SC_applyImpl(oldKey, newHex, targetKey); },
             ScriptLanguage.JAVASCRIPT, undefined, UndoModes.ENTIRE_SCRIPT, "Selection Colors");
+    } catch (e) {
+        if (!result) { result = { ok: false, error: e.toString() }; }
+    }
+    return SC_json(result || { ok: false, error: "No result" });
+}
+
+/* Sets opacity (0-100) on every distinct object behind this colour in the selection. */
+function SC_setOpacityImpl(key, opacity) {
+    var got = SC_collectSelection();
+    if (!got.text && got.items.length === 0) { return { ok: false, error: "Nothing selected" }; }
+    var sites = got.ctx.sites, seen = {}, changed = 0, unlocked = [], i, j;
+    try {
+        for (i = 0; i < sites.length; i++) {
+            var ds = SC_siteDescs(sites[i]), match = false;
+            for (j = 0; j < ds.length; j++) { if (ds[j].key === key) { match = true; break; } }
+            if (!match) { continue; }
+            var owner = SC_siteOwner(sites[i]);
+            if (!owner || !SC_valid(owner)) { continue; }
+            var ok2 = "";
+            try { ok2 = "o" + owner.id; } catch (e) { continue; }
+            if (seen[ok2]) { continue; }
+            seen[ok2] = true;
+            SC_unlockFor(sites[i], unlocked);
+            try { owner.transparencySettings.blendingSettings.opacity = opacity; changed++; } catch (e2) {}
+        }
+    } finally {
+        for (i = 0; i < unlocked.length; i++) { try { unlocked[i].locked = true; } catch (eR) {} }
+    }
+    return { ok: true, changed: changed };
+}
+function SC_setOpacity(key, opacity) {
+    key = String(key);
+    opacity = Math.max(0, Math.min(100, Math.round(Number(opacity))));
+    if (!SC_isDoc()) { return SC_json({ ok: false, error: "No open document" }); }
+    var result = null;
+    try {
+        app.doScript(function () { result = SC_setOpacityImpl(key, opacity); },
+            ScriptLanguage.JAVASCRIPT, undefined, UndoModes.ENTIRE_SCRIPT, "Selection Colors Opacity");
     } catch (e) {
         if (!result) { result = { ok: false, error: e.toString() }; }
     }

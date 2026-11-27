@@ -1,4 +1,4 @@
-SELECTION COLORS for After Effects, Illustrator and InDesign  (v1.5.5)
+SELECTION COLORS for After Effects, Illustrator and InDesign  (v1.6.0)
 Figma's "Selection colors" module, as a panel for AE 2022+, Illustrator 2022+ and InDesign 2022+.
 
 INSTALL - WINDOWS
@@ -44,6 +44,8 @@ USE
       type Hex or R G B (arrow keys nudge, Shift = x10).
       "In selection" / "In project" ("In document") chips: click one to use exactly that colour
       (the same swatch in InDesign, the same CMYK/spot values in Illustrator).
+      Opacity % (Illustrator / InDesign only): sets the transparency of the objects using that
+      colour, not the colour itself - blank means the objects currently differ.
       Close with X (top right) or Done (bottom right).
   - Eyedropper (pipette icon): click any pixel on any monitor to use it. Esc cancels.
       Windows: the screen freezes and a magnifier follows the cursor. First use takes a second

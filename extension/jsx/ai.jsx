@@ -201,6 +201,19 @@ function SC_visitItem(item, ctx) {
 
 function SC_newCtx() { return { sites: [], grads: {} }; }
 
+/* The object a site's opacity lives on (null for gradient stops and bare text-range selections). */
+function SC_siteOwner(site) {
+    if (site.t === "paint" || site.t === "stop") { return site.item; }
+    if (site.t === "text") { return site.owner; }
+    return null;
+}
+function SC_getOpac(o) {
+    try { return (typeof o.opacity === "number") ? o.opacity : null; } catch (e) { return null; }
+}
+function SC_ownerKey(o) {
+    try { return o.uuid || (SC_tn(o) + ":" + o.left + "," + o.top); } catch (e) { return null; }
+}
+
 /* Selection -> sites. Handles object selections and Type-tool text selections. */
 function SC_collectSelection(doc) {
     var ctx = SC_newCtx(), sel = null;
@@ -341,16 +354,25 @@ function SC_scan(deep) {
         for (i = 0; i < sites.length; i++) {
             if (new Date().getTime() - t0 > SC_SCAN_BUDGET_MS) { partial = true; break; }
             var ds = SC_siteDescs(sites[i]);
+            var owner = SC_siteOwner(sites[i]), op = owner ? SC_getOpac(owner) : null;
             for (j = 0; j < ds.length; j++) {
                 var d = ds[j], e = map["k" + d.key];
                 if (!e) {
-                    e = { id: d.key, hex: d.hex, label: d.label, count: 0, order: list.length, cats: {} };
+                    e = { id: d.key, hex: d.hex, label: d.label, count: 0, order: list.length, cats: {}, opMin: null, opMax: null };
                     map["k" + d.key] = e;
                     list.push(e);
                 }
                 e.count++;
                 e.cats[sites[i].cat] = (e.cats[sites[i].cat] || 0) + 1;
+                if (op !== null) {
+                    e.opMin = e.opMin === null ? op : Math.min(e.opMin, op);
+                    e.opMax = e.opMax === null ? op : Math.max(e.opMax, op);
+                }
             }
+        }
+        for (i = 0; i < list.length; i++) {
+            list[i].opacity = (list[i].opMin !== null && list[i].opMin === list[i].opMax) ? SC_r2(list[i].opMin) : null;
+            delete list[i].opMin; delete list[i].opMax;
         }
         list.sort(function (a, b) { return (b.count - a.count) || (a.order - b.order); });
         return SC_json({ status: "ok", layers: got.items.length, colors: list, partial: partial });
@@ -388,6 +410,29 @@ function SC_apply(oldKey, newHex, deep, targetKey) {
     }
     try { app.redraw(); } catch (eD) {}
     return SC_json({ ok: true, changed: changed, failed: failed, error: firstError, id: newKey });
+}
+
+/* Sets opacity (0-100) on every distinct object behind this colour in the selection. */
+function SC_setOpacity(key, opacity) {
+    key = String(key);
+    opacity = Math.max(0, Math.min(100, Math.round(Number(opacity))));
+    if (!SC_isDoc()) { return SC_json({ ok: false, error: "No open document" }); }
+    var doc = app.activeDocument, got = SC_collectSelection(doc);
+    if (!got.text && got.items.length === 0) { return SC_json({ ok: false, error: "Nothing selected" }); }
+    var sites = got.ctx.sites, seen = {}, changed = 0, i, j;
+    for (i = 0; i < sites.length; i++) {
+        var ds = SC_siteDescs(sites[i]), match = false;
+        for (j = 0; j < ds.length; j++) { if (ds[j].key === key) { match = true; break; } }
+        if (!match) { continue; }
+        var owner = SC_siteOwner(sites[i]);
+        if (!owner) { continue; }
+        var ok2 = SC_ownerKey(owner);
+        if (!ok2 || seen[ok2]) { continue; }
+        seen[ok2] = true;
+        try { owner.opacity = opacity; changed++; } catch (e) {}
+    }
+    try { app.redraw(); } catch (eD) {}
+    return SC_json({ ok: true, changed: changed });
 }
 
 /* Narrow the selection to objects using this colour (like Figma's "select matching layers"). */

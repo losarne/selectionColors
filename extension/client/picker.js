@@ -66,6 +66,7 @@
         '<label class="pk-f"><input data-k="1" inputmode="numeric" maxlength="3"><span>G</span></label>' +
         '<label class="pk-f"><input data-k="2" inputmode="numeric" maxlength="3"><span>B</span></label>' +
       '</div>' +
+      '<label class="pk-f pk-op pk-opacity-row"><input data-k="opacity" inputmode="numeric" maxlength="3" placeholder="Mixed"><span>Opacity %</span></label>' +
       '<div class="pk-sw-wrap">' +
         '<div class="pk-col" data-col="sel"><div class="pk-label">In selection</div><div class="pk-sw"></div></div>' +
         '<div class="pk-col" data-col="proj"><div class="pk-label"><span class="pk-proj-label">In project</span> <span class="pk-note"></span></div><div class="pk-sw"></div></div>' +
@@ -79,6 +80,7 @@
   var eye = q(".pk-eye"), statusEl = q(".pk-status");
   var selBox = q('[data-col="sel"] .pk-sw'), projBox = q('[data-col="proj"] .pk-sw'), projNote = q('[data-col="proj"] .pk-note'), projLabel = q(".pk-proj-label");
   var inHex = q('[data-k="hex"]'), inCh = [q('[data-k="0"]'), q('[data-k="1"]'), q('[data-k="2"]')];
+  var inOp = q('[data-k="opacity"]');
 
   /* ----------------------------------------------------------------- state */
   var st = {
@@ -87,6 +89,7 @@
     appliedHex: null,   // its hex (display)
     inflight: false, queued: false,
     target: null,       // exact colour id to snap to (chip click); null = use the hex
+    opacity: null, appliedOpacity: null,  // 0-100, or null when mixed/unknown (AE: always null)
     anchor: null, opts: null,
     project: null,      // { colors: [], partial: bool } or null while loading
     projectReq: 0,
@@ -228,6 +231,40 @@
     });
     input.addEventListener("blur", function () { applyChannel(input, idx); });
   });
+
+  function paintOpacity() { inOp.value = (st.opacity === null) ? "" : String(Math.round(st.opacity)); }
+
+  function commitOpacity(v) {
+    if (!st.opts || !st.opts.onOpacityCommit || !st.appliedId) { return; }
+    v = Math.max(0, Math.min(100, Math.round(v)));
+    if (v === st.appliedOpacity) { return; }
+    var prev = st.appliedOpacity;
+    st.opacity = st.appliedOpacity = v;   // optimistic
+    Promise.resolve(st.opts.onOpacityCommit(st.appliedId, v)).then(function (res) {
+      if (!res || !res.ok) { st.opacity = st.appliedOpacity = prev; paintOpacity(); }
+    }, function () { st.opacity = st.appliedOpacity = prev; paintOpacity(); });
+  }
+
+  inOp.addEventListener("focus", function () { setTimeout(function () { if (document.activeElement === inOp) { inOp.select(); } }, 0); });
+  inOp.addEventListener("keydown", function (e) {
+    e.stopPropagation();
+    if (e.key === "Enter") { e.preventDefault(); applyOpacityField(); inOp.select(); }
+    else if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      e.preventDefault();
+      var n = parseInt(inOp.value, 10); if (isNaN(n)) { n = st.opacity === null ? 100 : st.opacity; }
+      n = clamp(n + (e.key === "ArrowUp" ? 1 : -1) * (e.shiftKey ? 10 : 1), 0, 100);
+      inOp.value = String(n);
+      commitOpacity(n);
+    }
+  });
+  inOp.addEventListener("blur", applyOpacityField);
+  function applyOpacityField() {
+    var raw = inOp.value.trim();
+    if (raw === "") { paintOpacity(); return; }
+    var n = parseInt(raw, 10);
+    if (isNaN(n)) { paintOpacity(); return; }
+    commitOpacity(n);
+  }
   function applyChannel(input, idx) {
     var n = parseInt(input.value, 10), rgb = hexToRgb(hex());
     if (isNaN(n)) { input.value = String(rgb[idx]); return; }
@@ -388,6 +425,8 @@
     st.anchor = anchor;
     st.appliedId = color.id;
     st.appliedHex = color.hex;
+    st.opacity = st.appliedOpacity = (typeof color.opacity === "number") ? color.opacity : null;
+    paintOpacity();
     st.open = true;
     projLabel.textContent = st.opts.projectLabel || "In project";
     st.project = (st.opts.cachedProject && st.opts.cachedProject()) || null;
@@ -405,6 +444,7 @@
   function finishEdits() {
     var a = document.activeElement;
     if (a === inHex) { applyHexField(); }
+    else if (a === inOp) { applyOpacityField(); }
     else { for (var i = 0; i < 3; i++) { if (a === inCh[i]) { applyChannel(a, i); } } }
     if (nudgeTimer) { clearTimeout(nudgeTimer); nudgeTimer = null; commit(); }
   }
